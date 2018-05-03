@@ -10,12 +10,10 @@ import (
 )
 
 // An Account represents an AWS account you will use via an assumed role. You
-// can use the NewAccount constructor to set it up with just the role name or
-// you can just build it by providing the account ID and the full ARN of the
-// role to assume when using this Account.
+// should use the NewAccount constructor to set it up.
 //
 // If you need to use more than one role with one AWS account, simply construct
-// additional Account objects, specifying different role ARNs.
+// additional Account objects, specifying different roles.
 type Account struct {
 	Id            string
 	AssumeRoleArn string
@@ -53,6 +51,10 @@ func (a *Account) IAM() *iam.IAM {
 
 // Returns a lazily provisioned EC2 client for the given region.
 func (a *Account) EC2(region string) *ec2.EC2 {
+	if a.ec2svc == nil {
+		a.ec2svc = map[string]*ec2.EC2{}
+	}
+
 	if rv, ok := a.ec2svc[region]; ok {
 		return rv
 	} else {
