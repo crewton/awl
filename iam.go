@@ -7,8 +7,8 @@ import (
 // Returns (and caches) the account alias. If none is set, then returns the
 // account ID.
 func (a *Account) CacheAlias() (string, error) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
+	a.aliasLock.Lock()
+	defer a.aliasLock.Unlock()
 
 	resp, err := a.IAM().ListAccountAliases(&iam.ListAccountAliasesInput{})
 	if err == nil && len(resp.AccountAliases) > 0 {

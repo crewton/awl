@@ -20,10 +20,13 @@ type Account struct {
 	Alias         string
 	AssumeRoleArn string
 
-	creds  *credentials.Credentials
-	ec2svc map[string]*ec2.EC2
-	iamsvc *iam.IAM
-	lock   sync.Mutex
+	creds      *credentials.Credentials
+	ec2svc     map[string]*ec2.EC2
+	iamsvc     *iam.IAM
+	credsLock  sync.Mutex
+	ec2svcLock sync.Mutex
+	iamsvcLock sync.Mutex
+	aliasLock  sync.Mutex
 }
 
 // Constructs a new Account object from an AWS account ID and the name (not the
@@ -37,9 +40,9 @@ func NewAccount(id string, role string) *Account {
 // internally, but it's here if you need it.
 func (a *Account) Credentials() *credentials.Credentials {
 	if a.creds == nil {
-		a.lock.Lock()
+		a.credsLock.Lock()
 		a.creds = stscreds.NewCredentials(Session, a.AssumeRoleArn)
-		a.lock.Unlock()
+		a.credsLock.Unlock()
 	}
 	return a.creds
 }
@@ -48,9 +51,9 @@ func (a *Account) Credentials() *credentials.Credentials {
 // is a global service.
 func (a *Account) IAM() *iam.IAM {
 	if a.iamsvc == nil {
-		a.lock.Lock()
+		a.iamsvcLock.Lock()
 		a.iamsvc = iam.New(Session, &aws.Config{Credentials: a.Credentials(), Region: aws.String(DefaultRegion)})
-		a.lock.Unlock()
+		a.iamsvcLock.Unlock()
 	}
 	return a.iamsvc
 }
@@ -58,17 +61,17 @@ func (a *Account) IAM() *iam.IAM {
 // Returns a lazily provisioned EC2 client for the given region.
 func (a *Account) EC2(region string) *ec2.EC2 {
 	if a.ec2svc == nil {
-		a.lock.Lock()
+		a.ec2svcLock.Lock()
 		a.ec2svc = map[string]*ec2.EC2{}
-		a.lock.Unlock()
+		a.ec2svcLock.Unlock()
 	}
 
 	if rv, ok := a.ec2svc[region]; ok {
 		return rv
 	} else {
-		a.lock.Lock()
+		a.ec2svcLock.Lock()
 		a.ec2svc[region] = ec2.New(Session, &aws.Config{Credentials: a.Credentials(), Region: aws.String(region)})
-		a.lock.Unlock()
+		a.ec2svcLock.Unlock()
 		return a.ec2svc[region]
 	}
 }
