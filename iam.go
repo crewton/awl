@@ -6,23 +6,16 @@ import (
 
 // Returns (and caches) the account alias. If none is set, then returns the
 // account ID.
-func (a *Account) Alias() (string, error) {
-	if a.alias != "" {
-		return a.alias, nil
-	}
+func (a *Account) CacheAlias() (string, error) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
 
 	resp, err := a.IAM().ListAccountAliases(&iam.ListAccountAliasesInput{})
-	if err != nil {
-		a.alias = a.Id
-		return a.alias, err
-	}
-
-	if len(resp.AccountAliases) > 0 {
-		a.alias = *resp.AccountAliases[0]
+	if err == nil && len(resp.AccountAliases) > 0 {
+		a.Alias = *resp.AccountAliases[0]
 	} else {
-		// if no alias is set, just use the Account ID
-		a.alias = a.Id
+		a.Alias = a.Id
 	}
 
-	return a.alias, nil
+	return a.Alias, err
 }

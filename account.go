@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"sync"
 )
 
 // An Account represents an AWS account you will use via an assumed role. You
@@ -16,18 +17,19 @@ import (
 // additional Account objects, specifying different roles.
 type Account struct {
 	Id            string
+	Alias         string
 	AssumeRoleArn string
 
-	alias  string
 	creds  *credentials.Credentials
 	ec2svc map[string]*ec2.EC2
 	iamsvc *iam.IAM
+	lock   sync.Mutex
 }
 
 // Constructs a new Account object from an AWS account ID and the name (not the
 // full ARN) of a role, including the path, if any.
 func NewAccount(id string, role string) *Account {
-	return &Account{Id: id, AssumeRoleArn: fmt.Sprintf("arn:aws:iam::%s:role/%s", id, role)}
+	return &Account{Id: id, Alias: id, AssumeRoleArn: fmt.Sprintf("arn:aws:iam::%s:role/%s", id, role)}
 }
 
 // Fetches a lazily provisioned STS credentials manager which will renew the
@@ -35,7 +37,9 @@ func NewAccount(id string, role string) *Account {
 // internally, but it's here if you need it.
 func (a *Account) Credentials() *credentials.Credentials {
 	if a.creds == nil {
+		a.lock.Lock()
 		a.creds = stscreds.NewCredentials(Session, a.AssumeRoleArn)
+		a.lock.Unlock()
 	}
 	return a.creds
 }
@@ -44,7 +48,9 @@ func (a *Account) Credentials() *credentials.Credentials {
 // is a global service.
 func (a *Account) IAM() *iam.IAM {
 	if a.iamsvc == nil {
+		a.lock.Lock()
 		a.iamsvc = iam.New(Session, &aws.Config{Credentials: a.Credentials(), Region: aws.String(DefaultRegion)})
+		a.lock.Unlock()
 	}
 	return a.iamsvc
 }
@@ -52,13 +58,17 @@ func (a *Account) IAM() *iam.IAM {
 // Returns a lazily provisioned EC2 client for the given region.
 func (a *Account) EC2(region string) *ec2.EC2 {
 	if a.ec2svc == nil {
+		a.lock.Lock()
 		a.ec2svc = map[string]*ec2.EC2{}
+		a.lock.Unlock()
 	}
 
 	if rv, ok := a.ec2svc[region]; ok {
 		return rv
 	} else {
+		a.lock.Lock()
 		a.ec2svc[region] = ec2.New(Session, &aws.Config{Credentials: a.Credentials(), Region: aws.String(region)})
+		a.lock.Unlock()
 		return a.ec2svc[region]
 	}
 }
