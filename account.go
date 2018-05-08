@@ -60,18 +60,16 @@ func (a *Account) IAM() *iam.IAM {
 
 // Returns a lazily provisioned EC2 client for the given region.
 func (a *Account) EC2(region string) *ec2.EC2 {
+	a.ec2svcLock.Lock()
+	defer a.ec2svcLock.Unlock()
 	if a.ec2svc == nil {
-		a.ec2svcLock.Lock()
 		a.ec2svc = map[string]*ec2.EC2{}
-		a.ec2svcLock.Unlock()
 	}
 
 	if rv, ok := a.ec2svc[region]; ok {
 		return rv
 	} else {
-		a.ec2svcLock.Lock()
 		a.ec2svc[region] = ec2.New(Session, &aws.Config{Credentials: a.Credentials(), Region: aws.String(region)})
-		a.ec2svcLock.Unlock()
 		return a.ec2svc[region]
 	}
 }
