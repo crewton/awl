@@ -1,6 +1,7 @@
 package awl
 
 import (
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
@@ -13,4 +14,8 @@ var Session *session.Session
 func init() {
 	DefaultRegion = "us-east-1"
 	Session = session.Must(session.NewSession())
+}
+
+func SetBaseCredentials(creds *credentials.Credentials) {
+	Session.Config.Credentials = creds
 }
